@@ -1,6 +1,6 @@
 services:
   backend:
-    build: .
+    build: ./backend
     ports:
       - "5000:5000"
     environment:
@@ -11,7 +11,7 @@ services:
       OUTPUT_DIR: /app/outputs
       MAX_IMAGES: "10"
     volumes:
-      - ./outputs:/app/outputs
+      - ./backend/outputs:/app/outputs
     extra_hosts:
       # Lets the container reach ComfyUI/Ollama running on the host machine.
       - "host.docker.internal:host-gateway"

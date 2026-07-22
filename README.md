@@ -9,12 +9,13 @@ We believe that every story deserves to be brought to life with stunning visuals
 This application generates images from a user-provided story using two locally-hosted models:
 
 - **Story to prompt(s)**: a local [Ollama](https://ollama.com) LLM reads the story and writes short, descriptive image-generation prompt(s) capturing its key scenes.
-- **Prompt to image**: each prompt is injected into a [ComfyUI](https://github.com/comfyanonymous/ComfyUI) workflow (`backend/app/workflows/image_z_image_turbo_int8.json`, using the z-image-turbo-int8 model) and rendered by your local ComfyUI instance.
+- **Prompt to image**: each prompt is injected into a [ComfyUI](https://github.com/comfyanonymous/ComfyUI) workflow (`backend/workflows/image_z_image_turbo_int8.json`, using the z-image-turbo-int8 model) and rendered by your local ComfyUI instance.
 - **Saving results**: generated images are downloaded from ComfyUI and saved to a local `outputs/` directory, grouped per request.
 
 ## Architecture
 
 ```
+docker-compose.yml       Orchestrates the dockerized service(s) (backend today, frontend later)
 backend/
   app.py                 Flask app + entrypoint
   config.py              Environment-driven configuration
@@ -25,10 +26,12 @@ backend/
     comfyui_service.py     Queues the ComfyUI workflow, polls for results, saves images
   workflows/              ComfyUI workflow JSON template(s)
   outputs/                Generated images (git-ignored, mounted as a volume in Docker)
-  Dockerfile / docker-compose.yml
+  Dockerfile
 ```
 
-Only the backend is containerized. **ComfyUI and Ollama are expected to already be running locally** (ComfyUI on port `8188`, Ollama on port `11434`) — the backend just calls out to them over HTTP.
+`docker-compose.yml` lives at the repo root (not inside `backend/`) so that a future `frontend/` service can be added to it later. Each service still owns its own `Dockerfile` and build context.
+
+Only the backend is containerized right now. **ComfyUI and Ollama are expected to already be running locally** (ComfyUI on port `8188`, Ollama on port `11434`) — the backend just calls out to them over HTTP.
 
 ## Prerequisites
 
@@ -54,11 +57,10 @@ The API will be available at `http://localhost:5000`.
 Only the backend is dockerized — start ComfyUI and Ollama on the host first.
 
 ```bash
-cd backend
 docker compose up --build
 ```
 
-The compose file points the container at `http://host.docker.internal:8188` (ComfyUI) and `http://host.docker.internal:11434` (Ollama) so it can reach services running on your host machine. Generated images are written to `backend/outputs/` on the host via a mounted volume.
+Run from the repo root, where `docker-compose.yml` lives. The compose file points the container at `http://host.docker.internal:8188` (ComfyUI) and `http://host.docker.internal:11434` (Ollama) so it can reach services running on your host machine. Generated images are written to `backend/outputs/` on the host via a mounted volume.
 
 ## API
 
