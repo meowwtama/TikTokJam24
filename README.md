@@ -5,83 +5,103 @@ Our group understands the pains of creating eye-catching illustrations to accomp
 
 We believe that every story deserves to be brought to life with stunning visuals that captivate the audience and enhance the narrative experience. Our project aims to simplify the creation of illustrations, enabling writers to effortlessly generate beautiful images that complement and elevate their literary creations.
 
-By leveraging advanced AI technologies, we provide an innovative solution that bridges the gap between text and imagery. Our tool empowers authors to focus on their storytelling while seamlessly generating illustrations that resonate with their readers, making the process of creating illustrated literary works more accessible and enjoyable.
-
 ## Functionality
-This application generates images based on a user-provided story by leveraging OpenAI's GPT model and Bing Image Creator accessed via a reversed engineered API.
+This application generates images from a user-provided story using two locally-hosted models:
 
-- Story to Prompts: The OpenAI GPT model is used to analyse the user-provided story and generate concise, descriptive prompts that are then used for image generation. These prompts capture key scenes and elements of the story to ensure that the generated images accurately reflect the narrative.
+- **Story to prompt(s)**: a local [Ollama](https://ollama.com) LLM reads the story and writes short, descriptive image-generation prompt(s) capturing its key scenes.
+- **Prompt to image**: each prompt is injected into a [ComfyUI](https://github.com/comfyanonymous/ComfyUI) workflow (`backend/app/workflows/image_z_image_turbo_int8.json`, using the z-image-turbo-int8 model) and rendered by your local ComfyUI instance.
+- **Saving results**: generated images are downloaded from ComfyUI and saved to a local `outputs/` directory, grouped per request.
 
-- Image Generation: The generated prompts are then passed to the Bing Image Creator via its API. High-quality images based on the provided prompts.
+## Architecture
 
-- Displaying Results: The resulting images are displayed, providing visually compelling illustrations that complement and enhance the original story. The authors can then use the imagesto complement their works.
+```
+backend/
+  app.py                 Flask app + entrypoint
+  config.py              Environment-driven configuration
+  routes/                Flask blueprints (HTTP layer)
+  controllers/           Request orchestration / validation
+  services/
+    ollama_service.py      Calls the local Ollama API to turn a story into prompt(s)
+    comfyui_service.py     Queues the ComfyUI workflow, polls for results, saves images
+  workflows/              ComfyUI workflow JSON template(s)
+  outputs/                Generated images (git-ignored, mounted as a volume in Docker)
+  Dockerfile / docker-compose.yml
+```
 
-## Setup
+Only the backend is containerized. **ComfyUI and Ollama are expected to already be running locally** (ComfyUI on port `8188`, Ollama on port `11434`) — the backend just calls out to them over HTTP.
 
-### Prerequisites
+## Prerequisites
 
-- Python 3.6 or higher
-- Google Chrome browser
-- Git
-- Azure API Key from OpenAI
+- Python 3.10+ (if running without Docker) or Docker
+- [Ollama](https://ollama.com) running locally with a model pulled (e.g. `ollama pull llama3`)
+- [ComfyUI](https://github.com/comfyanonymous/ComfyUI) running locally on port `8188`, with the models referenced in `image_z_image_turbo_int8.json` installed (`qwen_3_4b_fp8_mixed.safetensors`, `ae.safetensors`, `z_image_turbo_int8_convrot.safetensors`)
 
-### Installation
+## Running locally (no Docker)
 
-1. **Clone the repository:**
+```bash
+cd backend
+python -m venv venv
+source venv/bin/activate  # On Windows: venv\Scripts\activate
+pip install -r requirements.txt
+cp .env.example .env  # adjust OLLAMA_BASE_URL / COMFYUI_BASE_URL if needed
+python app.py
+```
 
-    Clone the repo and follow the instructions below to set up.
+The API will be available at `http://localhost:5000`.
 
-2. **Create a virtual environment and activate it:**
+## Running with Docker
 
-    ```bash
-    python -m venv venv
-    source venv/bin/activate  # On Windows use `venv\Scripts\activate`
-    ```
+Only the backend is dockerized — start ComfyUI and Ollama on the host first.
 
-3. **Install the required dependencies:**
+```bash
+cd backend
+docker compose up --build
+```
 
-    ```bash
-    pip install -r requirements.txt
-    ```
+The compose file points the container at `http://host.docker.internal:8188` (ComfyUI) and `http://host.docker.internal:11434` (Ollama) so it can reach services running on your host machine. Generated images are written to `backend/outputs/` on the host via a mounted volume.
 
-4. **Create a `.env` file in the root directory of the project and add your API keys and other necessary environment variables. You can use the `.env.example` file as a reference:**
+## API
 
-    ```bash
-    cp .env.example .env
-    ```
+### `POST /api/images/generate`
 
-5. **Open the `.env` file and add your API keys and other environment variables:**
+Request body:
 
-    ```bash
-    AZURE_API_KEY='replace_with_your_azure_api_key'
-    AZURE_ENDPOINT='replace_with_your_azure_endpoint'
-    ```
+```json
+{
+  "story": "On a stormy night, Lily found an old, dusty key hidden in her grandmother's attic...",
+  "num_images": 3
+}
+```
 
-### Running the Application
+- `story` (string, required): must be at least `MIN_STORY_LENGTH` characters (default 20).
+- `num_images` (int, optional): number of scenes/images to generate (default 1, max `MAX_IMAGES`, default 10).
 
-1. **Run the Flask application:**
+Response:
 
-    ```bash
-    python app.py
-    ```
+```json
+{
+  "images": [
+    { "prompt": "...", "file_path": "outputs/20260723_143000_ab12cd34/image_1.png" }
+  ]
+}
+```
 
-2. **Open your browser (Google Chrome recommended) and navigate to `http://localhost:5000`.**
+### `GET /api/images/health`
 
-3. **Follow the instructions on the webpage to generate images based on your story.**
+Simple health check, returns `{"status": "ok"}`.
 
-### Project Structure
+## Configuration
 
-- `app.py`: The main Flask application file.
-- `authcheck.py`: Handles Bing login and cookie extraction.
-- `BingImageCreator.py`: Contains the Bing Image Creator integration.
-- `llm.py`: Handles prompt generation using OpenAI's GPT model.
-- `templates/`: Contains the HTML templates.
-  - `home.html`: The homepage where users input the number of images and their story.
-  - `instructions.html`: Instructions for logging into Bing.
-  - `display_images.html`: Displays the generated images.
-- `.env.example`: Example environment file to help users set up their own `.env`.
+All configuration is via environment variables (see `backend/.env.example`):
 
-### Acknowledgements
-This project makes use of the following third-party library:
-- [Bing Image Creator](https://github.com/acheong08/BingImageCreator) - The use of their API to access Bing's AI image generator.
-- [OpenAI](https://www.openai.com) - The use in code for generating text prompts based on the story input.
+| Variable | Default | Description |
+|---|---|---|
+| `OLLAMA_BASE_URL` | `http://localhost:11434` | Base URL of the local Ollama server |
+| `OLLAMA_MODEL` | `llama3` | Ollama model used to generate prompts |
+| `OLLAMA_TIMEOUT` | `120` | Timeout (seconds) for Ollama requests |
+| `COMFYUI_BASE_URL` | `http://localhost:8188` | Base URL of the local ComfyUI server |
+| `COMFYUI_TIMEOUT` | `300` | Max time (seconds) to wait for ComfyUI to finish an image |
+| `COMFYUI_POLL_INTERVAL` | `2` | Seconds between polls of ComfyUI's `/history` endpoint |
+| `OUTPUT_DIR` | `outputs` | Directory generated images are saved to |
+| `MIN_STORY_LENGTH` | `20` | Minimum accepted story length |
+| `MAX_IMAGES` | `10` | Maximum images allowed per request |

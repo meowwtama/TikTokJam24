@@ -1,1 +1,5 @@
-"On a stormy night, Lily found an old, dusty key hidden in her grandmother's attic. Curiosity piqued, she unlocked a forgotten trunk, revealing a map to buried treasure. With a determined heart and a flashlight, she embarked on an adventure, discovering not gold, but her family's lost legacy."
+bash
+
+cd "c:/Users/intern/Desktop/Jx/techjam/TikTokJam24/backend" && time curl -s -m 300 -X POST http://localhost:5000/api/images/generate \
+  -H "Content-Type: application/json" \
+  -d '{"story": "On a stormy night, Lily found an old, dusty key hidden in her grandmother'"'"'s attic. Curiosity piqued, she unlocked a forgotten trunk, revealing a map to buried treasure. With a determined heart and a flashlight, she embarked on an adventure, discovering not gold, but her family'"'"'s lost legacy.", "num_images": 1}' | python -m json.tool
