@@ -1,0 +1,17 @@
+services:
+  backend:
+    build: ./backend
+    ports:
+      - "5000:5000"
+    environment:
+      OLLAMA_BASE_URL: http://host.docker.internal:11434
+      OLLAMA_MODEL: llama3
+      COMFYUI_BASE_URL: http://host.docker.internal:8188
+      COMFYUI_TIMEOUT: "300"
+      OUTPUT_DIR: /app/outputs
+      MAX_IMAGES: "10"
+    volumes:
+      - ./backend/outputs:/app/outputs
+    extra_hosts:
+      # Lets the container reach ComfyUI/Ollama running on the host machine.
+      - "host.docker.internal:host-gateway"
